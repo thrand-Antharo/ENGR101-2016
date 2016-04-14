@@ -1,0 +1,830 @@
+
+from Tkinter import *
+import tkFileDialog
+from tkFileDialog import askopenfilename # Open dialog box
+import time
+
+class App:
+    assem_txt = None # assembler text window
+    mem_cell = None   # memory contents
+    mem_addr = None   
+    pc_text = None    # program counter
+    ir_text_o = None  # operand part of Instruction Register
+    ir_text_a = None # address part of Instruction register
+    acc_text = None
+    
+    mem_canvas = None #animations
+    io_canvas = None
+    
+    in_text = None    # input and output entries 
+    out_text = None
+    
+    pressed = 0      # key pressed flag
+
+    #key pressed event 
+    def kp(self,event):
+        #global pressed
+        self.pressed = 0
+        #print 'Event check. keysym=', event.keysym
+        if event.keysym == 'space':
+            #print 'Pressed'
+            self.pressed =1
+
+    # if checkbox is ticked - wait until keypress
+    # if not - wait animation delay
+    #@classmethod
+    def AnimStep(self):
+        global ani_text # to read delay
+        #global pressed
+        animation_delay = float(ani_text.get(1.0, END))
+        a = man_ani.get()
+        #print ' AnimStep(), a=',a
+        if a == 0:
+            time.sleep(animation_delay)
+            return
+        # spin waiting for keypress
+        self.pressed = 0
+        while self.pressed == 0:
+            root.update()
+        
+    #@classmethod
+    def IncrementPC(self):
+        pc_int = int(self.pc_text.get())
+        self.pc_text.delete(0,END)
+        self.pc_text.insert(0,str(pc_int+1))
+
+    #def HighLightEntry(self,entry):
+    #    Self.entry.configure(bg='red')
+
+    def FetchOperand(self):
+       # highlight PC - source of address
+       self.pc_text.configure(bg='red')
+       App.AnimStep(self)
+       # read program counter
+       pc_int = int(self.pc_text.get())
+       print "pc_int=",pc_int
+       # fetch cycle
+       # PC->address
+       self.mem_canvas.create_line(90, 0, 90, 80,width =10,fill="black",arrow="first")
+       address = int(self.pc_text.get())
+       strout = "address:\n %s" %address
+       self.mem_canvas.create_text(20,40,text=strout,fill="black",anchor=NW)
+       self.mem_canvas.update_idletasks()
+       self.mem_addr[pc_int].configure(bg='red')
+       App.AnimStep(self)
+       # mem -> IR
+       self.pc_text.configure(bg='white')
+       self.mem_addr[pc_int].configure(bg='black')
+       
+       self.mem_cell[pc_int].configure(bg='red')
+       self.ir_text_o.configure(bg='red')
+       self.ir_text_a.configure(bg='red')
+       op_code = " "
+       op_code = str(self.mem_cell[pc_int].get())
+       op_code = op_code[0:3] # just in case
+       print ' opcode=',op_code
+       self.ir_text_a.delete(0,END)
+       self.ir_text_a.insert(0,op_code[1:3])
+       self.ir_text_o.delete(0,END)
+       self.ir_text_o.insert(0,op_code[0])
+       
+       self.mem_canvas.create_line(160, 0, 160, 80,width =10,fill="black",arrow="last")
+       strout = "data:\n %s" %op_code
+       self.mem_canvas.create_text(165,40,text=strout,fill="black",anchor=NW)
+       self.mem_canvas.update_idletasks()
+       App.AnimStep(self)
+       self.mem_cell[pc_int].configure(bg='white')
+       self.ir_text_o.configure(bg='white')
+       self.ir_text_a.configure(bg='white')
+       return op_code
+       
+
+    # get instruction from memory based on PC value
+    # execute it
+    def ExecuteOPCODE(self):
+
+       # sets value of ACC
+       def SetACC(value):
+           self.acc_text.delete(0,END)  
+           self.acc_text.insert(0, value)
+
+
+       def DrawAddressLine(addr):
+          #1 address bus
+           self.mem_canvas.create_line(290, 0, 290, 80,width =10,fill="black",arrow="first")
+           #address = int(op_code[1])*10 + int(op_code[2])
+           strout = "address:\n %s" %addr
+           self.mem_canvas.create_text(240,40,text=strout,fill="black",anchor=NW)
+           self.mem_canvas.update_idletasks()
+
+       def DrawDataLine(data_value, direction):
+           if direction==0: #arrow down
+             self.mem_canvas.create_line(430, 0, 430, 80,width =10,fill="black",arrow="last")
+           if direction==1: #arrow up 
+             self.mem_canvas.create_line(430, 80, 430, 0,width =10,fill="black",arrow="last")
+           strout = "data:\n %s" %data_value
+           self.mem_canvas.create_text(365,40,text=strout,fill="black",anchor=NW)
+           self.mem_canvas.update_idletasks()
+       
+       print "ExecuteOPCODE() called "
+       # animation for mem<->processor
+       self.mem_canvas.delete("all") #clear canvas
+       self.mem_canvas.update_idletasks()
+       self.io_canvas.delete("all") #clear canvas
+       self.io_canvas.update_idletasks()
+
+       # highlight line of assembler text
+       pc_int = int(self.pc_text.get())
+       self.assem_txt.tag_delete("high")
+       self.assem_txt.tag_config("high", background="yellow")
+       self. assem_txt.tag_add("high", "%s.0" %(pc_int+1), "%s.9" %(pc_int+1))  
+       
+       op_code = App.FetchOperand(self)
+       
+       # execute operand
+       oper = op_code[0]
+       print "oper=", oper
+       if (oper=='1') or (oper=='2') or (oper=='3') or (oper=='5'):
+           print "change color"
+           #self.ir_text.tag_add("highir", "1.1", "1.3") 
+       App.AnimStep(self)
+
+       # execute opcode
+       # instruction
+       if op_code[0] == '1':
+           print "   Add"
+           # get value from memory
+           address = int(op_code[1])*10 + int(op_code[2])
+           value = int(self.mem_cell[address].get())
+           #animate
+           DrawAddressLine(address)
+           App.AnimStep(self)
+           #data bus
+           DrawDataLine(value, 0)
+           App.AnimStep(self) #time.sleep(animation_delay)
+           # get accumulator
+           acc_value = int(self.acc_text.get())
+           # add value
+           new_value = value + acc_value
+           SetACC(new_value)
+           App.IncrementPC(self)
+
+           
+       if op_code[0] == '2':
+           print "   substract"
+           # get value from memory
+           address = int(op_code[1])*10 + int(op_code[2])
+           value = int(self.mem_cell[address].get())
+           #animate
+           DrawAddressLine(address)
+           App.AnimStep(self)
+           #data bus
+           DrawDataLine(value, 0)
+           App.AnimStep(self) #time.sleep(animation_delay)
+           # get accumulator
+           acc_value = int(self.acc_text.get())
+           # subtract
+           new_value = acc_value - value
+           SetACC(new_value)
+           App.IncrementPC(self)
+           
+       if op_code[0] == '3':
+           print "   store"
+           # get accumulator
+           acc_value = int(self.acc_text.get())
+           address = int(op_code[1])*10 + int(op_code[2])
+           print "addr=",address," value=",acc_value
+           
+           #animate
+           DrawAddressLine(address)
+           App.AnimStep(self)
+           
+           DrawDataLine(acc_value, 1)
+           App.AnimStep(self)
+           self.mem_cell[address].delete(0,END)  
+           self.mem_cell[address].insert(0, acc_value)
+           self.mem_cell[address].update_idletasks()
+           self.acc_text.update_idletasks()
+           
+           self.acc_text.update_idletasks()
+           App.IncrementPC(self)
+
+           
+       if op_code[0] == '5':
+           print "   load"
+           # get value from memory
+           address = int(op_code[1])*10 + int(op_code[2])
+           value = int(self.mem_cell[address].get())
+           #animate
+           DrawAddressLine(address)
+           App.AnimStep(self)
+           DrawDataLine(value, 0)
+           App.AnimStep(self)
+           SetACC(value)
+           App.IncrementPC(self)
+
+       #unconditional jump           
+       if (op_code[0] == '6'): #BRA
+           address = int(op_code[1])*10 + int(op_code[2])
+           print ' address to jump:', address
+           self.pc_text.delete(0, END)  
+           self.pc_text.insert(0, str(address))
+           pc_int = address
+           print ' PC after:', int(self.pc_text.get())
+           
+       # if ACC == 0 -> JUMP    
+       if op_code[0] == '7':
+           address = int(op_code[1])*10 + int(op_code[2])
+           acc_value = int(self.acc_text.get())
+           print 'BRZ encountered, acc_value=',acc_value,' address=',address
+           if acc_value == 0:
+              self.pc_text.delete(0, END)  
+              self.pc_text.insert(0, address)
+           else:
+               App.IncrementPC(self)
+
+       # if ACC > 0 -> JUMP       
+       if op_code[0] == '8':
+           address = int(op_code[1])*10 + int(op_code[2])
+           acc_value = int(self.acc_text.get())
+           if acc_value > 0:
+              self.pc_text.delete(0, END)  
+              self.pc_text.insert(0, address)
+           else:
+               App.IncrementPC(self)
+
+       # INP       
+       if (op_code[0]=='9') and (op_code[1]=='0') and (op_code[2]=='1') :
+           # get IN value and put into acc
+           value_in = self.in_text.get()
+           print value_in
+           
+           #animate io_canvas
+           w=self.io_canvas.winfo_width()
+           h=self.io_canvas.winfo_height()
+           self.io_canvas.create_line(0, h/2, w, h/2,width =10,fill="black",arrow="first")
+           strout = "data:\n %s" %value_in
+           self.io_canvas.create_text(w/2,h/2-30,text=strout,fill="black",anchor=NW)
+           self.io_canvas.update_idletasks()
+           App.AnimStep(self) #time.sleep(animation_delay)
+           SetACC(value_in)
+           #self.acc_text.delete(0, END) 
+           #self.acc_text.insert(0, value_in)
+           App.IncrementPC(self)
+           
+       if (op_code[0]=='9') and (op_code[1]=='0') and (op_code[2]=='2') :
+           print "    OUT"
+           # get IN value
+           self.out_text.delete(0,END)
+           value_out = self.acc_text.get()
+           #out_text.insert('1.0', value_out )
+           #animate io_canvas
+           w=self.io_canvas.winfo_width()
+           h=self.io_canvas.winfo_height()
+           self.io_canvas.create_line(0, h/2, w, h/2,width =10,fill="black",arrow="last")
+           strout = "data:\n %s" %value_out
+           self.io_canvas.create_text(w/2,h/2-30,text=strout,fill="black",anchor=NW)
+           self.io_canvas.update_idletasks()
+           App.AnimStep(self) #time.sleep(animation_delay)
+           self.out_text.insert(0, value_out )
+           App.IncrementPC(self)
+
+           
+       if (op_code[0] == '0'):
+           print "     HALT"
+           #self.mem_cell[pc_int].tag_delete("highl")
+           pc = -1
+           
+       print 'Execute finished op_code[0]=',op_code[0]
+
+    # translate assembler into opcodes:
+    #   put [addr] name DAT value into memory
+    # fill program memmory with opcodes
+    def AssToRAM(self):
+
+         # opcodes_array: - code was changed, can be replaced with 1D arrar
+          #   col0:   operand
+          #   col1:   memory contents
+          #   col2:   variable name
+          #   col3:   label
+          opcodes_array = None
+          assem_lines = None    # array of assembler lines as text
+     
+          def CheckVars(cand_var, list_var):
+              print 'Checking'
+              print 'cand_var=',cand_var
+              print 'list_var=',list_var
+              index = 0
+              for name in list_var:
+                  print 'cand_var=',cand_var,'name=',name
+                  if cand_var == name:
+                      print ' FOund at ',index
+                      return index
+                  index = index + 1
+              #index = list_var.find(cand_var)
+              print 'index=',index
+              #if cand_var in 
+              return -1
+            
+          def PrintOpCodes(oparray):
+              nline=0
+              for cline in oparray:
+                  print 'line ',nline,'  ',cline
+                  nline = nline + 1
+
+          # returns code of keyword        
+          def GetKWCode(word):
+              if (word == 'HLT'):
+                  return 0
+              if (word == 'ADD'):
+                  return 100
+              if (word == 'SUB'):
+                  return 200
+              if (word == 'STO'):
+                  return 300
+              if (word == 'LDA'):
+                  return 500
+              if (word == 'BRA'):
+                  return 600
+              if (word == 'BRZ'):
+                  return 700
+              if (word == 'BRP'):
+                  return 800
+              if (word == 'INP'):
+                  return 901
+              if (word == 'OUT'):
+                  return 902
+              return -1  
+
+              
+          # returns 1 if word is keyword
+          def IsKeyWord(word):
+              if (word == 'HLT'):
+                  return 1
+              if (word == 'ADD'):
+                  return 1
+              if (word == 'SUB'):
+                  return 1
+              if (word == 'STO'):
+                  return 1
+              if (word == 'LDA'):
+                  return 1
+              if (word == 'BRA'):
+                  return 1
+              if (word == 'BRZ'):
+                  return 1
+              if (word == 'BRP'):
+                  return 1
+              if (word == 'INP'):
+                  return 1
+              if (word == 'OUT'):
+                  return 1
+              return 0
+            
+
+          # if 1st word is not keyword - it is label        
+          def CheckForLabel(string,line_num):
+             words = string.split(' ')
+             if len(words)>0:
+                print '     Check for Label ',string
+                if (IsKeyWord(words[0]) == 0):
+                    if (words[1]!='DAT'):
+                       print '    label found',words[0]
+                       opcodes_array[line_num][3] = words[0]
+
+          # find address (i.e. line number ) of the variable
+          # using variable name
+          def FindVarAddress(var_name):
+              print 'Looking for ',var_name,' address'
+              i_line = 0
+              for s in assem_lines:
+                  print '       i_line=',i_line,'    current line: ',s
+                  if s.find('DAT')>-1:
+                      if s.find(var_name)>-1:
+                         print '      Found'
+                         return i_line
+                  i_line = i_line + 1
+                  
+              return -1
+
+          # find address(i.e. line number) of line with label 
+          def FindLabelAddress(label):
+              print 'Looking for label',label,' address'
+              i_line = 0
+              for s in assem_lines:
+                  print '       i_line=',i_line,'    current line: ',s
+                  #if s.find('DAT')>-1:
+                  if s.find(label)>-1:
+                      print '      Label found'
+                      return i_line
+                  i_line = i_line + 1
+                  
+              return -1
+
+          # convert to machine codes operator without jumps        
+          def ParseOperand(string,line_num,keyword):
+              #check position of 'keyword'
+              nc = line.find(keyword)
+              print keyword,'    nc=',nc
+              # split the string
+              words = string.split()
+              # what is position of 'keyword'?
+              print '   words=',words,' len=',len(words)
+              # where in 'words' keyword is?
+              # there can be label at the front...
+              # look through words[]
+              kw_pos = 0
+              i = 0
+              for kw in words:
+                 print '   kw=',kw
+                 if kw == keyword:
+                    kw_pos = i
+                 i = i + 1    
+              print '   kw_pos=',kw_pos
+              # one after 'keyword' is an address
+              if kw_pos+1>len(words):
+                  print '    Address missing in ',string
+              # get opcode    
+              oppr = int(GetKWCode(words[kw_pos]))  
+              # take next word after keyword...    
+              after_kw = words[kw_pos+1]
+              print '    after_kw=',after_kw
+              #if words[kw_pos] == 0: # it is first - no label
+              if after_kw.isdigit(): #address contains numbers only
+                print '     Address directly'
+                addr = int(after_kw)
+                print '     add=',addr
+                opcodes_array[line_num][0] = oppr + addr
+              else: # address contains letters - variable    
+                print '     Variable ',after_kw 
+                addr = FindVarAddress(after_kw)
+                print '     addr=',addr
+                opcodes_array[line_num][0] = oppr + addr
+
+          # Parse operands with jumps
+          def ParseJumpOperand(string,line_num,keyword):
+              #check position of 'keyword'
+              nc = line.find(keyword)
+              print keyword,'     nc=',nc
+              # split the string
+              words = string.split()
+              # what is position of 'keyword'?
+              print '     words=',words,' len=',len(words)
+              kw_pos = 0
+              i = 0
+              for kw in words:
+                 print '   kw=',kw
+                 if kw == keyword:
+                    kw_pos = i
+                 i = i + 1    
+              print '   kw_pos=',kw_pos
+              # one after 'keyword' is a label
+              if kw_pos+1>len(words):
+                  print '    Jump address missing in ',string
+              # get opcode    
+              oppr = int(GetKWCode(words[kw_pos]))  
+              # take next word after keyword...    
+              after_kw = words[kw_pos+1]
+              print '    after_kw=',after_kw
+              #if words[kw_pos] == 0: # it is first - no label
+              if after_kw.isdigit(): #address contains numbers only
+                print '     Address directly'
+                addr = int(after_kw)
+                print '     add=',addr
+                opcodes_array[line_num][0] = oppr + addr
+              else: # address contains letters - variable    
+                print '     Label ',after_kw 
+                addr = FindLabelAddress(after_kw)
+                print '     label addr=',addr
+                opcodes_array[line_num][0] = oppr + addr
+              
+
+          # jump operands processed differntly
+          # from operation operands
+          def SetOpCodeOperand(string,line_num):
+              print '******SetOpcodeOperand: string=',string
+              if string.find('HLT') > -1: # simple command
+                  opcodes_array[line_num][0] = 0
+              if string.find('ADD') > -1:
+                 ParseOperand(string,line_num,'ADD')
+              if string.find('SUB') > -1:
+                 ParseOperand(string,line_num,'SUB')
+              if string.find('STO') > -1:
+                 ParseOperand(string,line_num,'STO')
+              if string.find('LDA') > -1:
+                 ParseOperand(string,line_num,'LDA')
+
+              if string.find('BRA') > -1:
+                  ParseJumpOperand(string,line_num,'BRA')
+                  #opcodes_array[line_num][0] = 6
+              if string.find('BRZ') > -1:
+                  ParseJumpOperand(string,line_num,'BRZ')
+                  #opcodes_array[line_num][0] = 7
+              if string.find('BRP') > -1:
+                  ParseJumpOperand(string,line_num,'BRP')
+                  #opcodes_array[line_num][0] = 8
+                  
+              if string.find('INP') > -1:  #simple command
+                  opcodes_array[line_num][0] = 901
+              if string.find('OUT') > -1:  #simple command
+                  opcodes_array[line_num][0] = 902
+              CheckForLabel(string,line_num)
+                   
+          # check if there is DAT in the line
+          # before DAT - variable name
+          # after DAT (if there) - variable initial value
+          def SetMemoryInitailValues(string,line_num):
+               nc = line.find('DAT') # can not have label
+               if nc > -1:
+                   words = string.split(' ')
+                   print '    nw=',len(words),'words=',words
+                   var_name = words[0]
+                   opcodes_array[line_num][1] = 'VAR'
+                   opcodes_array[line_num][2] = var_name
+                   if len(words) == 3:
+                       # set inital value
+                       opcodes_array[line_num][0] = int(words[2])
+                            
+
+              
+         
+          txt = self.assem_txt.get("1.0",END) #get assembler text from text window
+          #print 'print txt'
+          #print txt
+          assem_lines = txt.strip().split('\n') # parse on CRs
+          print 'assem_lines'
+          print assem_lines
+          print 'len=',len(assem_lines)
+          # reset program counter
+          self.pc_text.delete(0, END)  
+          #self.pc_text.insert(0, "00")
+          self.ir_text_o.delete(0, END)  
+          self.ir_text_a.delete(0, END)  
+
+          # clear memory cells
+          num_lines = 0
+          for line in assem_lines:
+              if len(line)>0:
+                 self.mem_cell[num_lines].delete(0,END)  
+                 num_lines = num_lines + 1
+          print 'Non-empty lines: num_line=',num_lines
+          
+          opcodes_array=[[-1 for j in range(7)] for i in range(num_lines)]
+         
+          n_line = 0
+          for line in assem_lines:
+              SetOpCodeOperand(line,n_line)
+              SetMemoryInitailValues(line,n_line)
+              n_line = n_line+1
+          print 'After first pass:'    
+          PrintOpCodes(opcodes_array)
+
+          # move to memory first column of opcodes_array
+          str_out = ' '
+          n_line = 0
+          for line in assem_lines:
+              str_out = "%03d"%opcodes_array[n_line][0]
+              self.mem_cell[n_line].delete(0)
+              self.mem_cell[n_line].insert(0,str_out)
+              n_line = n_line + 1
+
+          # set PC to 0    
+          str_out = '00'
+          self.pc_text.delete(0,END)
+          self.pc_text.insert(0,str_out)
+          #for row_num in range(num_lines):
+          #    str_out = "%02d\n"%row_num
+          #    opcode_txt.insert(END,str_out)
+              
+    def Run(self):
+        print "Run clicked"
+        App.ExecuteOPCODE(self)  #force execution of first operand
+        # step through operands until HALT
+        opc = int(self.ir_text_o.get())
+        print 'opc=',opc
+        while opc != 0:
+            App.ExecuteOPCODE(self)
+            opc = int(self.ir_text_o.get())
+            print 'opc=',opc
+        
+    def Step(self):
+        print "step clicked"
+        App.ExecuteOPCODE(self)
+         
+    def Reset(self):
+        global pc
+        print "Reset clicked"
+        self.pc_text.delete(0,END)  
+        self.pc_text.insert(0, '000')
+        #pc = 0
+
+    # load assembler file from HDD
+    def Load(self):
+        filename = askopenfilename(filetypes=[("LMC files","*.lmc")])
+        if filename:
+            try:
+              f=open(filename)
+              txt = f.read()
+              print txt
+              self.assem_txt.insert(END, txt)
+              f.close() 
+            except:         # <- naked except is a bad idea
+                print "Failed to read file\n'%s'" % filename
+            return
+     
+    def Save(self):
+        print "Save"
+        filename = tkFileDialog.asksaveasfilename(filetypes=[("All files","*.lmc")])
+        if filename:
+            try:
+                txt = self.assem_txt.get("1.0",END)
+                print txt
+                f=open(filename,"w")
+                f.write(txt)
+                #self.assem_txt.insert(END, txt)
+                f.close() 
+            except:         # <- naked except is a bad idea
+                print "Failed to save file\n'%s'" % filename
+            return
+    
+    def man_ani_checkbutton_value(arg):
+        a = man_ani.get()
+
+    # initialize everything    
+    def __init__(self, master):
+        global ani_text
+        global man_ani
+       
+        win_width = 950 #800
+        win_height = 600
+             
+        #ALU position/size
+        alu_x = 2
+        alu_y = 330
+        alu_w = 520
+        alu_h = 90
+               
+        
+        #draw background
+        frame = Frame(master,bg="honeydew")
+        self.mem_canvas = Canvas(master, width=alu_w, height=330-253,bg="honeydew")
+        self.mem_canvas.place(x=2,y=252)
+        
+        # make table of memory cells
+        # memory table position and size
+        mem_x = 2
+        mem_y = 2
+        mem_w = 520
+        mem_h = 250
+        ram_label = LabelFrame(master, text="MEMORY",bd=5,bg="black",fg="white")
+        ram_label.place(x=mem_x,y=mem_y,width=mem_w,height=mem_h)
+        # table size: rows/columns
+        mc_rows = 10
+        mc_cols = 10
+        # size of one memory cell: 2 chars address, 3 chars contents
+        mem_cell_w = (mem_w-20)/mc_cols
+        mem_cell_h = (mem_h-30)/mc_rows
+        
+        self.mem_cell = [0]*101 #1D array of 100
+        self.mem_addr = [0]*101
+        # go through all addresses
+        addr =0
+        for i in range(mc_rows): #Rows
+           for j in range(mc_cols): #Columns
+             self.mem_addr[addr] = Label(master,text=str(addr),fg="cyan",bg="black")
+             self.mem_addr[addr].place(x=10+i*mem_cell_w, y=20+j*mem_cell_h, width=2*mem_cell_w/5, height=mem_cell_h)
+             self.mem_cell[addr] = Entry(master) #, height = mem_cell_h,width=3*mem_cell_w/5)
+             self.mem_cell[addr].insert(0, "000")
+             self.mem_cell[addr].place(x=10+i*mem_cell_w+2*mem_cell_w/5, y=20+j*mem_cell_h,height = mem_cell_h,width=3*mem_cell_w/5)
+             #width=30, height=20)
+             addr = addr + 1
+        
+
+        #ALU
+        alu_frame = LabelFrame(master, text="PROCESSOR",bd=5,fg="white",bg="black")
+        alu_frame.place(x=alu_x,y=alu_y,height=alu_h, width=alu_w)
+        #ALU - program counter
+        pc_label = Label(master, text="Program Counter",fg="white",bg="black")
+        pc_label.place(x=alu_x+10,y=alu_y+15,anchor=NW)
+        self.pc_text=Entry(master)
+        self.pc_text.insert(0,"00")
+        self.pc_text.place(x=alu_x+10,y=alu_y+5+alu_h/2,height = mem_cell_h,width=50,anchor=NW)
+        
+        
+        #ALU - instruction register: 2 text windows - opcode(o) and address(a)
+        ir_label = Label(master, text="OpCode",fg="white",bg="black")
+        ir_label.place(x=alu_x+15+alu_w/3,y=alu_y+15,height = mem_cell_h,width=50,anchor=NW)
+        self.ir_text_o = Entry(master)
+        self.ir_text_o.insert(0,'0')
+        self.ir_text_o.place(x=alu_x+15+alu_w/3,y=alu_y+5+alu_h/2,height = mem_cell_h,width=15,anchor=NW)
+        self.ir_text_a = Entry(master)
+        self.ir_text_a.insert(0,'00')
+        self.ir_text_a.place(x=alu_x+15+alu_w/3 + 15,y=alu_y+5+alu_h/2,height = mem_cell_h,width=30,anchor=NW)
+        
+        #ALU - ACCUMULATOR
+        self.acc_text=Entry(master)
+        self.acc_text.place(x=alu_x+15+2*alu_w/3+alu_w/6,y=alu_y+5+alu_h/2,width=45,anchor=NW)
+        self.acc_text.insert(0,'0')
+        # working register - not used in classic LMC
+        #wr_text=Entry(master)
+        #wr_text.place(x=alu_x+15+2*alu_w/3,y=alu_y+5+alu_h/2,width=45,anchor=NW)
+        #wr_text.insert(0,'0')
+        
+        acc_label = Label(master, text="Calculator",fg="white",bg="black")
+        acc_label.place(x=alu_x+15+2*alu_w/3,y=alu_y+15,anchor=NW)
+        
+        #acc1_label = Label(master, text="Operand",fg="white",bg="black")
+        #acc1_label.place(x=alu_x+15+2*alu_w/3,y=alu_y+30,anchor=NW)
+        acc2_label = Label(master, text="Result",fg="white",bg="black")
+        acc2_label.place(x=alu_x+15+2*alu_w/3+alu_w/6,y=alu_y+30,anchor=NW)
+           
+        #assembler text window
+        ass_x = 620
+        ass_y = 10
+        ass_w = 300
+        ass_h = 230
+        #assembler text - multiline
+        ass_frame = LabelFrame(master, text="ASSEMBLER",bd=5)
+        ass_frame.place(x=ass_x,y=ass_y,height=ass_h, width=ass_w)
+        
+        # assembler text window
+        self.assem_txt = Text(master, height= ass_h-10, width=(ass_w-10)/2)
+        self.assem_txt.place(x=ass_x+10,y=ass_y+20,height=ass_h-30, width=(ass_w-10)/2)
+        # opcodes text window
+        #opcode_txt = Text(master, height= ass_h-10, width=(ass_w-10)/3,fg="blue")
+        #opcode_txt.place(x=ass_x+10+(ass_w-10)/3,y=ass_y+20,height=ass_h-30, width=(ass_w-10)/3)
+        
+        #BUTTONS - ASSEMBLER CONTROL
+        #TO RAM
+        btnh = (ass_h-30)/6 # buttons height
+        btnw = (ass_w-10)/2
+        btnx = ass_x+1*ass_w/2
+        to_RAm_btn = Button(master, text="To RAM", command=self.AssToRAM)
+        to_RAm_btn.place(x=btnx,y=ass_y+20,height=btnh, width=btnw)
+       
+        run_btn = Button(master, text="Run", command=self.Run)
+        run_btn.place(x=btnx,y=ass_y+20 + btnh,height=btnh, width=btnw)
+        step_btn = Button(master, text="Step", command=self.Step)
+        step_btn.place(x=btnx,y=ass_y+20 + 2*btnh,height=btnh, width=btnw)
+        reset_btn = Button(master, text="Reset", command=self.Reset)
+        reset_btn.place(x=btnx,y=ass_y+20 + 3*btnh,height=btnh, width=btnw)
+        load_btn = Button(master, text="Load", command=self.Load)
+        load_btn.place(x=btnx,y=ass_y+20 + 4*btnh,height=btnh, width=btnw)
+        save_btn = Button(master, text="Save", command=self.Save)
+        save_btn.place(x=btnx,y=ass_y+20 + 5*btnh,height=btnh, width=btnw)
+        #animation speed tetxbox
+        ani_lab = Label(master, text="Animation speed:")
+        ani_lab.place(x=ass_x,y=ass_y+ass_h+10, height=20, width=100)
+        ani_text = Text(master, height= 20, width=30)
+        ani_text.place(x=ass_x+110,y=ass_y+ass_h+10,height=20, width=30)
+        ani_text.insert(1.0,"0.5")
+        # manual animation checkbox
+        man_ani = IntVar()
+        man_ani_checkbox = Checkbutton(root, text='Manual animation',variable = man_ani,\
+                                       command = self.man_ani_checkbutton_value)
+        man_ani_checkbox.place(x=ass_x,y=ass_y+ass_h+10+35,height=20, width=130)
+        self.pressed = 0
+        
+
+        # IO group
+        io_x = 600
+        io_y = 330
+        io_w = 120
+        dw= (io_w-30)/2
+        io_h = 90
+        io_frame = LabelFrame(master, text="INPUT/OUTPUT",bd=5,fg="white",bg="black")
+        io_frame.place(x=io_x,y=io_y,height=io_h, width=io_w)
+        
+        in_lab = Label(master, text="IN",fg="white",bg="black")
+        in_lab.place(x=io_x+10,y=io_y+30,height=20, width=io_w/2)
+        self.in_text = Entry(master,  width=io_w/2)
+        self.in_text.place(x=io_x+10,y=io_y+50,height=20, width=io_w/2)
+        self.in_text.insert(0,"0")
+         
+        out_lab = Label(master, text="OUT",fg="white",bg="black")
+        out_lab.place(x=io_x+10+dw,y=io_y+30,height=20, width=io_w/2)
+        self.out_text = Entry(master, width=io_w/2)
+        self.out_text.place(x=io_x+10+ dw,y=io_y+50,height=20, width=io_w/2)
+        # i/o animation canvas
+        self.io_canvas = Canvas(master, width=io_x-(alu_w+alu_x), height=io_h,bg="honeydew")
+        self.io_canvas.place(x=alu_w+alu_x,y=alu_y)
+        
+        frame.place(width=win_width, height=win_height)
+        frame.bind_all("<Key>", self.kp) #key listener
+      
+   
+
+root = Tk()
+#root.geometry("950x440+30+30")
+root.geometry("950x440+30+30")
+
+root.title("Little Man Computer")
+
+app = App(root)
+
+root.mainloop()
+
+root.destroy() # optional; see description below
+
+
+root.mainloop()
